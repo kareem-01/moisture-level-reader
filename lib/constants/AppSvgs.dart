@@ -1,5 +1,5 @@
 class AppSvgs {
-  static const String _svgsPath = "assets/svgs";
+  static const String _svgsPath = "assets/svg/";
 
   static const String homeUnSelected = "${_svgsPath}home_icon_un_selected.svg";
   static const String homeSelected = "${_svgsPath}home_icon_selected.svg";

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:soil_moisture_app/common/theme/color/AppColors.dart';
 
+import '../common/widgets/custom_containers/dynamic_container.dart';
 import '../constants/AppSvgs.dart';
 import '../features/AboutScreen.dart';
 import '../features/HistoryScreen.dart';
@@ -47,7 +50,7 @@ enum NavItem {
           duration: Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: isActivated ? context.appColors.primary : Colors.transparent,
+            color: isActivated ? AppColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -64,7 +67,7 @@ enum NavItem {
                   colorFilter: ColorFilter.mode(
                     isActivated
                         ? Colors.white
-                        : context.appColors.text.withOpacity(0.4),
+                        : AppColors.darkGrey.withValues(alpha: 0.4),
                     BlendMode.srcIn,
                   ),
                 ),
@@ -75,7 +78,7 @@ enum NavItem {
                   children: [
                     const SizedBox(width: 4),
                     Text(
-                      context.tr(tabName),
+                      tabName,
                       style: TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   ],

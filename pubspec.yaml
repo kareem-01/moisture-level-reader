@@ -33,8 +33,25 @@ dependencies:
 
   flutter_native_splash: ^2.4.3
 
+  #util
+  velocity_x: ^4.3.1
+
+  #ui - widget
+  nav: ^1.4.3
+  simple_shadow: ^0.3.1
+  flutter_svg: ^2.0.10+1
   cupertino_icons: ^1.0.8
 
+  flutter_screenutil: ^5.9.3
+  
+  #bluetooth
+  flutter_blue_plus: ^1.31.15
+  
+  #storage
+  shared_preferences: ^2.2.2
+  
+  #formatting
+  intl: ^0.20.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -43,5 +60,7 @@ dev_dependencies:
 
 
 flutter:
-
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/svg/

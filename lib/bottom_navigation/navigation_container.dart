@@ -1,23 +1,13 @@
-import 'package:fast_app_base/common/dart/extension/context_extension.dart';
-import 'package:fast_app_base/common/data/preference/extentions.dart';
-import 'package:fast_app_base/common/util/guest_util.dart';
-import 'package:fast_app_base/common/util/navigation_helper.dart';
-import 'package:fast_app_base/common/util/ui_helper.dart';
-import 'package:fast_app_base/features/auth/presentation/cubit/login_info/login_info_cubit.dart';
-import 'package:fast_app_base/features/auth/presentation/pages/auth_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:nav/nav.dart';
 import 'package:velocity_x/velocity_x.dart';
 
-import '../../common/constant/dimentions.dart';
-import '../../common/data/data_stream.dart';
-import '../../common/di/injection_container.dart';
 import '../../common/util/system_bars_util.dart';
+import '../common/constants/dimensions.dart';
+import '../common/theme/color/AppColors.dart';
 import 'nav_item.dart';
 import 'nav_navigator.dart';
-
-final logoutStream = DataStream();
 
 class NavigationContainer extends StatefulWidget {
   const NavigationContainer({super.key});
@@ -44,14 +34,6 @@ class NavigationContainerState extends State<NavigationContainer>
   @override
   void initState() {
     super.initState();
-    try {
-      logoutStream.stream.listen((data) {
-        _onUnauthorizedListener(data);
-      });
-    } catch (e) {}
-    if (GuestUtil.isGuest) {
-      // tabs.removeAt(1);
-    }
     initNavigatorKeys();
   }
 
@@ -63,7 +45,6 @@ class NavigationContainerState extends State<NavigationContainer>
 
   @override
   void dispose() {
-    logoutStream.dispose();
     super.dispose();
   }
 
@@ -77,16 +58,18 @@ class NavigationContainerState extends State<NavigationContainer>
         body: Stack(
           children: [
             Container(
-              color: context.appColors.background,
-              margin:
-                  EdgeInsets.only(bottom: kBottomNavigationBarHeight + 14.h),
+              color: AppColors.background,
+              margin: EdgeInsets.only(
+                bottom: kBottomNavigationBarHeight + 14.h,
+              ),
               child: pages,
             ),
             Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: _buildBottomNavigationBar(context)),
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildBottomNavigationBar(context),
+            ),
           ],
         ),
       ),
@@ -98,16 +81,20 @@ class NavigationContainerState extends State<NavigationContainer>
       _currentTabNavigationKey.currentState?.canPop() == false;
 
   IndexedStack get pages => IndexedStack(
-      index: _currentIndex,
-      children: tabs
-          .mapIndexed((tab, index) => Offstage(
+    index: _currentIndex,
+    children:
+        tabs
+            .mapIndexed(
+              (tab, index) => Offstage(
                 offstage: _currentTab != tab,
                 child: NavNavigator(
                   navigatorKey: navigatorKeys[index],
                   tabItem: tab,
                 ),
-              ))
-          .toList());
+              ),
+            )
+            .toList(),
+  );
 
   void _handleBackPressed(bool didPop) {
     if (!didPop) {
@@ -126,10 +113,7 @@ class NavigationContainerState extends State<NavigationContainer>
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-            color: context.appColors.navigationBorder,
-            width: 1.0,
-          ),
+          top: BorderSide(color: AppColors.navigationBorder, width: 1.0),
         ),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(bottomNavigationBarBorderRadius),
@@ -137,9 +121,10 @@ class NavigationContainerState extends State<NavigationContainer>
         ),
         boxShadow: [
           BoxShadow(
-              color: context.appColors.shadowColor,
-              spreadRadius: AppDimentions.shadowSpreadRadius,
-              blurRadius: AppDimentions.shadowBlurRadius * 2),
+            color: AppColors.shadowColor,
+            spreadRadius: AppDimensions.shadowSpreadRadius,
+            blurRadius: AppDimensions.shadowBlurRadius * 2,
+          ),
         ],
       ),
       child: SizedBox(
@@ -152,9 +137,9 @@ class NavigationContainerState extends State<NavigationContainer>
           child: BottomNavigationBar(
             items: navigationBarItems(context),
             currentIndex: _currentIndex,
-            backgroundColor: context.appColors.onBackground,
-            selectedItemColor: context.appColors.primary,
-            unselectedItemColor: context.appColors.text.withOpacity(0.4),
+            backgroundColor: AppColors.onBackground,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: AppColors.text.withOpacity(0.4),
             onTap: _handleOnTapNavigationBarItem,
             showSelectedLabels: false,
             showUnselectedLabels: false,
@@ -213,29 +198,22 @@ class NavigationContainerState extends State<NavigationContainer>
   void _setSystemBarColors(int index) {
     if (index < 2) {
       SystemBarsUtil.changeStatusAndNavigationBars(
-        statusBarColor: context.appColors.seedColor,
-        navBarColor: context.appColors.seedColor,
+        statusBarColor: AppColors.seedColor,
+        navBarColor: AppColors.seedColor,
         isBlackIcons: context.isDarkMode ? false : true,
       );
     } else if (index == 2) {
       SystemBarsUtil.changeStatusAndNavigationBars(
-        statusBarColor: context.appColors.transparent,
-        navBarColor: context.appColors.seedColor,
-        isBlackIcons: context.isDarkMode.not(),
+        statusBarColor: AppColors.transparent,
+        navBarColor: AppColors.seedColor,
+        isBlackIcons: !context.isDarkMode,
       );
     } else {
       SystemBarsUtil.changeStatusAndNavigationBars(
-        statusBarColor: context.appColors.transparent,
-        navBarColor: context.appColors.seedColor,
+        statusBarColor: AppColors.transparent,
+        navBarColor: AppColors.seedColor,
         isBlackIcons: context.isDarkMode ? false : true,
       );
     }
-  }
-
-  void _onUnauthorizedListener(String data) {
-    showErrorToast(data);
-    popToFirst(context);
-    Nav.pushReplacement(const AuthScreen());
-    sl<LoginInfoCubit>().init();
   }
 }
