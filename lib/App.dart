@@ -32,7 +32,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       child: MaterialApp(
         title: 'Soil Moisture App',
         debugShowCheckedModeBanner: false,
-        home: SplashScreen(),
+        home: SafeArea(child: SplashScreen()),
       ),
     );
   }

@@ -14,4 +14,5 @@ class AppColors {
   static Color get text => AppColors.darkGrey;
 
   static Color get seedColor => onBackground;
+  static const Color logoColor = Color(0xFF21B698);
 }

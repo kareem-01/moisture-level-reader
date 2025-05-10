@@ -1,13 +1,13 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:soil_moisture_app/common/extensions/context_extension.dart';
 import 'package:soil_moisture_app/constants/AppImages.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:soil_moisture_app/models/moisture_reading.dart';
 import 'package:soil_moisture_app/services/readings_service.dart';
-import 'dart:convert';
-import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,61 +21,97 @@ class _HomeScreenState extends State<HomeScreen> {
   final FlutterBluePlus flutterBlue = FlutterBluePlus();
   List<ScanResult> _devicesList = [];
   BluetoothDevice? _connectedDevice;
-  BluetoothCharacteristic? _dataCharacteristic;
   bool _isConnected = false;
   bool _isScanning = false;
-  String _sensorData = "No data";
-  late StreamSubscription<List<ScanResult>> _scanSubscription;
+  List<String> _measurements = [];
   final ReadingsService _readingsService = ReadingsService();
+  bool _isConnectingToDevice = false;
 
   @override
   void initState() {
     super.initState();
-    // Setup Bluetooth scan results listener
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-      setState(() {
-        _devicesList = results;
-        _isScanning = false;
-      });
-    });
   }
 
-  @override
-  void dispose() {
-    _scanSubscription.cancel();
-    super.dispose();
-  }
-
-  // Method to scan for Bluetooth devices
-  void _startScan() async {
+  Future<void> _scanBluetoothDevices() async {
     setState(() {
       _isScanning = true;
-      _devicesList = [];
     });
 
-    try {
-      // Check if Bluetooth is on
-      if (await FlutterBluePlus.adapterState.first ==
-          BluetoothAdapterState.off) {
-        // Request to turn on Bluetooth
-        FlutterBluePlus.turnOn();
-        return;
-      }
-
-      // Start scanning
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
-    } catch (e) {
+    if (await FlutterBluePlus.isSupported == false) {
+      _showDialog(
+        context,
+        "Bluetooth Error",
+        "Bluetooth is not available on this device",
+      );
       setState(() {
         _isScanning = false;
       });
+      return;
     }
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
+
+    FlutterBluePlus.scanResults.listen(
+      (results) {
+        setState(() {
+          _devicesList = results;
+        });
+
+        _logBluetoothDevices(results);
+      },
+      onDone: () {
+        setState(() {
+          _isScanning = false;
+        });
+      },
+    );
+
+    await Future.delayed(Duration(seconds: 4));
+    FlutterBluePlus.stopScan();
+    setState(() {
+      _isScanning = false;
+    });
+  }
+
+  void _showDialog(
+    BuildContext context,
+    String title,
+    String message, {
+    Function()? onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Color(0xFF1E2A45),
+          title: Text(title, style: TextStyle(color: Colors.white)),
+          content: Text(message, style: TextStyle(color: Colors.white)),
+          actions: [
+            TextButton(
+              child: Text("OK", style: TextStyle(color: Color(0xFF51CF66))),
+              onPressed: () {
+                Navigator.of(context).pop();
+                if (onConfirm != null) {
+                  onConfirm();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _logBluetoothDevices(List<ScanResult> results) {
+    print(
+      "Found devices: ${results.map((result) => result.device.name).join(', ')}",
+    );
   }
 
   // Method to connect to a device
-  void _connectToDevice(BluetoothDevice device) async {
+  Future<void> _connectToDevice(BluetoothDevice device) async {
     try {
       setState(() {
-        _isScanning = true;
+        _isConnectingToDevice = true;
       });
 
       // Connect to the device
@@ -86,23 +122,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Look for a service with a characteristic for data
       for (BluetoothService service in services) {
-        for (BluetoothCharacteristic characteristic in service
-            .characteristics) {
+        print('service');
+        for (BluetoothCharacteristic characteristic
+            in service.characteristics) {
           if (characteristic.properties.notify ||
               characteristic.properties.read) {
-            _dataCharacteristic = characteristic;
 
             // If the characteristic supports notifications, subscribe to them
             if (characteristic.properties.notify) {
               await characteristic.setNotifyValue(true);
               characteristic.lastValueStream.listen((value) {
-                setState(() {
+                scheduleMicrotask(() {
                   try {
-                    _sensorData = utf8.decode(value);
-                    // Save the reading when we get valid data
-                    _saveReading(_sensorData);
+                    final decodedData = utf8.decode(value);
+
+                    // Parse the list of measurements
+                    List<String> newMeasurements = decodedData.split(',');
+
+                    // Update UI on the main thread
+                    setState(() {
+                      _measurements = newMeasurements;
+                    });
+
+                    // Save each reading in the list
+                    _saveReadings(newMeasurements);
                   } catch (e) {
-                    _sensorData = "Error decoding: ${value.toString()}";
+                    setState(() {
+                      _measurements = ["Error decoding: ${value.toString()}"];
+                    });
                   }
                 });
               });
@@ -111,13 +158,25 @@ class _HomeScreenState extends State<HomeScreen> {
             // If the characteristic is readable, read the initial value
             if (characteristic.properties.read) {
               final value = await characteristic.read();
-              setState(() {
+              // Use a microtask to avoid blocking the main thread
+              scheduleMicrotask(() {
                 try {
-                  _sensorData = utf8.decode(value);
-                  // Save the reading when we get valid data
-                  _saveReading(_sensorData);
+                  final decodedData = utf8.decode(value);
+
+                  // Parse the list of measurements
+                  List<String> newMeasurements = decodedData.split(',');
+
+                  // Update UI on the main thread
+                  setState(() {
+                    _measurements = newMeasurements;
+                  });
+
+                  // Save each reading in the list
+                  _saveReadings(newMeasurements);
                 } catch (e) {
-                  _sensorData = "Error decoding: ${value.toString()}";
+                  setState(() {
+                    _measurements = ["Error decoding: ${value.toString()}"];
+                  });
                 }
               });
             }
@@ -128,13 +187,13 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _connectedDevice = device;
         _isConnected = true;
-        _isScanning = false;
+        _isConnectingToDevice = false;
       });
     } catch (e) {
       setState(() {
         _isConnected = false;
         _connectedDevice = null;
-        _isScanning = false;
+        _isConnectingToDevice = false;
       });
     }
   }
@@ -149,146 +208,269 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isConnected = false;
         _connectedDevice = null;
-        _dataCharacteristic = null;
+        _measurements = [];
       });
     }
   }
 
   // Save moisture reading to storage
-  void _saveReading(String data) {
-    try {
-      // Parse the moisture value from the sensor data
-      final double moistureValue = double.parse(data.replaceAll('%', ''));
+  void _saveReadings(List<String> data) {
+    // Avoid blocking the main thread for saving data
+    scheduleMicrotask(() {
+      try {
+        // Process each measurement string in the list
+        List<double> parsedValues = [];
 
-      // Create a reading object
-      final reading = MoistureReading(
-        value: moistureValue,
-        timestamp: DateTime.now(),
-      );
+        for (String measurement in data) {
+          // Clean the data and check if it's valid
+          String cleanData = measurement.trim();
+          if (cleanData.isEmpty) {
+            print('Empty measurement data, skipping');
+            continue;
+          }
 
-      // Save the reading
-      _readingsService.saveReading(reading);
-    } catch (e) {
-      print('Error saving reading: $e');
-    }
+          // Try to parse the measurement
+          // First try to extract any numeric value from a string that might include labels
+          RegExp regExp = RegExp(r'[+-]?\d+(\.\d+)?');
+          Match? match = regExp.firstMatch(cleanData);
+
+          double? moistureValue;
+          if (match != null) {
+            moistureValue = double.tryParse(match.group(0) ?? '');
+          } else {
+            // If no match, try to parse the whole string (after removing % if present)
+            moistureValue = double.tryParse(cleanData.replaceAll('%', '').substring(3));
+          }
+
+          if (moistureValue == null) {
+            print('Failed to parse measurement: $cleanData');
+            continue;
+          }
+
+          parsedValues.add(moistureValue);
+        }
+
+        // Only save if we have at least one valid measurement
+        if (parsedValues.isNotEmpty) {
+          // Calculate average of all measurements
+          double averageValue =
+              parsedValues.reduce((a, b) => a + b) / parsedValues.length;
+
+          final reading = MoistureReading(
+            values: parsedValues,
+            timestamp: DateTime.now(),
+            average: averageValue,
+          );
+
+          // Save the reading
+          _readingsService.saveReading(reading);
+        }
+      } catch (e) {
+        print('Error saving reading: $e');
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Image.asset(
-          AppImages.background,
-          width: context.deviceWidth,
-          height: context.deviceHeight,
-          fit: BoxFit.fitHeight,
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          child: Image.asset(
-            AppImages.agrCultureEngineeringImage,
-            width: 56.w,
-            height: 56.h,
+    return SafeArea(
+      child: Stack(
+        children: [
+          Image.asset(
+            AppImages.background,
+            width: context.deviceWidth,
+            height: context.deviceHeight,
+            fit: BoxFit.fitHeight,
           ),
-        ),
-        Positioned(
-          top: 0,
-          right: 0,
-          child: Image.asset(
-            AppImages.facultyOfAgriculture,
-            width: 56.w,
-            height: 56.h,
+          Positioned(
+            top: 24.h,
+            right: 0,
+            left: 0,
+            child: Image.asset(
+              AppImages.homeLogo,
+              width: 160.w,
+              height: 160.h,
+            ),
           ),
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Column(
-            children: [
-              SizedBox(height: 100.h),
-              Text(
-                'Soil Moisture Level:',
-                style: TextStyle(fontSize: 24.sp, color: Colors.black),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(height: 100.h),
+                  Text(
+                    'Soil Moisture Level:',
+                    style: TextStyle(fontSize: 24.sp, color: Colors.white),
+                  ),
+                  SizedBox(height: 20.h),
+                  if (!_isConnected)
+                    Text(
+                      "-%",
+                      style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 150.h,
+                      width: 300.w,
+                      padding: EdgeInsets.all(10.w),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(color: Colors.green, width: 2),
+                      ),
+                      child: _measurements.isEmpty
+                          ? Center(child: Text("No measurements received"))
+                          : ListView.builder(
+                        itemCount: _measurements.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.symmetric(vertical: 5.h),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Sensor ${index + 1}:",
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  _measurements[index],
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  SizedBox(height: 20.h),
+                  _isConnected
+                      ? ElevatedButton(
+                    onPressed: _disconnect,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 30.w,
+                        vertical: 10.h,
+                      ),
+                          ),
+                    child: Text(
+                      'Disconnect',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        color: Colors.white,
+                      ),
+                          ),
+                  )
+                      : ElevatedButton(
+                    onPressed: _isScanning || _isConnectingToDevice
+                        ? null
+                        : () async {
+                      _scanBluetoothDevices();
+                      _showDevicesDialog(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 30.w,
+                        vertical: 10.h,
+                      ),
+                          ),
+                    child: _isConnectingToDevice
+                        ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16.w,
+                          height: 16.w,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          'Connecting...',
+                                      style: TextStyle(
+                                        fontSize: 16.sp,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  'Connect to Sensor',
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                  ),
+                ],
               ),
-              SizedBox(height: 20.h),
-              Text(
-                _isConnected ? _sensorData : "-%",
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              SizedBox(height: 10.h),
-              _isConnected
-                  ? ElevatedButton(
-                onPressed: _disconnect,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 30.w, vertical: 10.h),
-                ),
-                child: Text(
-                  'Disconnect',
-                  style: TextStyle(fontSize: 16.sp, color: Colors.white),
-                ),
-              )
-                  : ElevatedButton(
-                onPressed: _isScanning ? null : () =>
-                    _showDevicesDialog(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 30.w, vertical: 10.h),
-                ),
-                child: Text(
-                  'Connect to Sensor',
-                  style: TextStyle(fontSize: 16.sp, color: Colors.white),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   // Dialog to show available devices
   void _showDevicesDialog(BuildContext context) {
-    _startScan();
+    // Reset scanning state before showing dialog
+    setState(() {
+      _isScanning = false;
+    });
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
+            final devicesList = List<ScanResult>.from(_devicesList);
+
             return AlertDialog(
               title: Text('Select Bluetooth Device'),
               content: SizedBox(
                 width: double.maxFinite,
                 height: 300.h,
-                child: _isScanning
-                    ? const Center(child: CircularProgressIndicator())
-                    : _devicesList.isEmpty
-                    ? const Center(child: Text('No devices found'))
-                    : ListView.builder(
-                  itemCount: _devicesList.length,
-                  itemBuilder: (context, index) {
-                    final device = _devicesList[index].device;
-                    return ListTile(
-                      title: Text(device.platformName.isEmpty
-                          ? device.remoteId.toString()
-                          : device.platformName),
-                      subtitle: Text(device.remoteId.toString()),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _connectToDevice(device);
-                      },
-                    );
-                  },
-                ),
+                child:
+                    _isScanning
+                        ? const Center(child: CircularProgressIndicator())
+                        : devicesList.isEmpty
+                        ? const Center(child: Text('No devices found'))
+                        : ListView.builder(
+                          itemCount: devicesList.length,
+                          itemBuilder: (context, index) {
+                            final device = devicesList[index].device;
+                            return ListTile(
+                              title: Text(
+                                device.platformName.isEmpty
+                                    ? device.remoteId.toString()
+                                    : device.platformName,
+                              ),
+                              subtitle: Text(device.remoteId.toString()),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _connectToDevice(device);
+                              },
+                            );
+                          },
+                        ),
               ),
               actions: [
                 TextButton(
@@ -302,7 +484,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() {
                       _isScanning = true;
                     });
-                    _startScan();
+                    setDialogState(() {
+                      _isScanning = true;
+                    });
+                    _scanBluetoothDevices().then((_) {
+                      if (context.mounted) {
+                        setDialogState(() {
+                          _isScanning = false;
+                        });
+                      }
+                    });
                   },
                   child: Text(_isScanning ? 'Scanning...' : 'Refresh'),
                 ),

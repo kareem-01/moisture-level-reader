@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:soil_moisture_app/models/moisture_reading.dart';
 import 'package:soil_moisture_app/services/readings_service.dart';
+import 'package:velocity_x/velocity_x.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -79,26 +80,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       horizontal: 16.w,
                       vertical: 8.h,
                     ),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.water_drop,
-                        color: _getMoistureColor(reading.value),
-                        size: 36.r,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.r),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.water_drop,
+                                    color: _getMoistureColor(reading.average),
+                                    size: 24.r,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    DateFormat(
+                                      'MMM dd, yyyy - hh:mm a',
+                                    ).format(reading.timestamp),
+                                    style: TextStyle(fontSize: 14.sp),
+                                  ),
+                                ],
+                              ),
+                              _getMoistureStatus(reading.average),
+                            ],
+                          ),
+                          Divider(height: 16.h),
+                          Text(
+                            'Sensor readings:',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          ...reading.values.mapIndexed((entry, index) {
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: 4.h),
+                              child: Text(
+                                'Sensor ${index + 1}: ${entry.toStringAsFixed(1)}%',
+                                style: TextStyle(fontSize: 14.sp),
+                              ),
+                            );
+                          }).toList(),
+                          Divider(height: 16.h),
+                          Row(
+                            children: [
+                              Text(
+                                'Average: ',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${reading.average.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getMoistureColor(reading.average),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      title: Text(
-                        '${reading.value.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: Text(
-                        DateFormat(
-                          'MMM dd, yyyy - hh:mm a',
-                        ).format(reading.timestamp),
-                        style: TextStyle(fontSize: 14.sp),
-                      ),
-                      trailing: _getMoistureStatus(reading.value),
                     ),
                   );
                 },
@@ -134,7 +182,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: color),
       ),

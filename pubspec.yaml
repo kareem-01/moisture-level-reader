@@ -45,7 +45,7 @@ dependencies:
   flutter_screenutil: ^5.9.3
   
   #bluetooth
-  flutter_blue_plus: ^1.31.15
+  flutter_blue_plus: ^1.35.5
   
   #storage
   shared_preferences: ^2.2.2
@@ -57,10 +57,37 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^5.0.0
-
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
     - assets/svg/
+
+flutter_native_splash:
+  color: "#21B698"
+  image: assets/images/app_icon.png
+  android: true
+  ios: true
+
+  # The following are optional parameters
+  android_gravity: center
+  ios_content_mode: center
+  fullscreen: true
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/app_icon.jpg"
+  min_sdk_android: 24
+  remove_alpha_ios: true
+  background_color: "#21B698"
+  adaptive_icon_background: "#21B698"
+  adaptive_icon_foreground: "assets/images/app_icon.jpg"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false

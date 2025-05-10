@@ -37,8 +37,8 @@ class _SplashScreenState extends State<SplashScreen> {
           height: double.infinity,
           width: double.infinity,
           curve: Curves.linear,
-          startColor: AppColors.primary,
-          endColor: AppColors.background,
+          startColor: AppColors.logoColor,
+          endColor: AppColors.logoColor,
         ),
         Center(
           child: Container(
@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
               duration: const Duration(milliseconds: 1700),
               bounceDuration: const Duration(milliseconds: 2100),
               child: Image.asset(
-                AppImages.splash,
+                AppImages.appIcon,
                 width: MediaQuery.of(context).size.width * 0.45,
                 alignment: Alignment.center,
                 fit: BoxFit.contain,
