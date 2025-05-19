@@ -21,9 +21,7 @@ class MoistureReading {
   // Create from Map for retrieval
   factory MoistureReading.fromMap(Map<String, dynamic> map) {
     return MoistureReading(
-      values: map['values'] is List<int>
-          ? (map['values'] as List<int>).map((e) => e.toDouble()).toList()
-          : map['values'] as List<double>,
+      values: (map['values'] as List).map((e) => e is int ? e.toDouble() : e as double).toList(),
       timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp']),
       average: map['average'] is int
           ? (map['average'] as int).toDouble()

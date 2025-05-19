@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:soil_moisture_app/common/util/toast%20util.dart';
 import 'package:soil_moisture_app/models/moisture_reading.dart';
 import 'package:soil_moisture_app/services/readings_service.dart';
 import 'package:velocity_x/velocity_x.dart';
@@ -37,7 +38,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _readings = readings;
       });
     } catch (e) {
-      print('Error loading readings: $e');
+      showErrorToast('Failed to load readings. Please try again.');
       setState(() {
         _readings = [];
       });
@@ -71,85 +72,113 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   style: TextStyle(fontSize: 18.sp),
                 ),
               )
-              : ListView.builder(
-                itemCount: _readings.length,
-                itemBuilder: (context, index) {
-                  final reading = _readings[index];
-                  return Card(
-                    margin: EdgeInsets.symmetric(
-                      horizontal: 16.w,
-                      vertical: 8.h,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(12.r),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.water_drop,
-                                    color: _getMoistureColor(reading.average),
-                                    size: 24.r,
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Text(
-                                    DateFormat(
-                                      'MMM dd, yyyy - hh:mm a',
-                                    ).format(reading.timestamp),
-                                    style: TextStyle(fontSize: 14.sp),
-                                  ),
-                                ],
-                              ),
-                              _getMoistureStatus(reading.average),
-                            ],
+              : Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _readings.length,
+                      itemBuilder: (context, index) {
+                        final reading = _readings[index];
+                        return Card(
+                          margin: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 8.h,
                           ),
-                          Divider(height: 16.h),
-                          Text(
-                            'Sensor readings:',
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: EdgeInsets.all(12.r),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.water_drop,
+                                          color: _getMoistureColor(reading.average),
+                                          size: 24.r,
+                                        ),
+                                        SizedBox(width: 8.w),
+                                        Text(
+                                          DateFormat(
+                                            'MMM dd, yyyy - hh:mm a',
+                                          ).format(reading.timestamp),
+                                          style: TextStyle(fontSize: 14.sp),
+                                        ),
+                                      ],
+                                    ),
+                                    _getMoistureStatus(reading.average),
+                                  ],
+                                ),
+                                Divider(height: 16.h),
+                                Text(
+                                  'Sensor readings:',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 4.h),
+                                ...reading.values.mapIndexed((entry, index) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(bottom: 4.h),
+                                    child: Text(
+                                      'Sensor ${index + 1}: ${entry.toStringAsFixed(1)}%',
+                                      style: TextStyle(fontSize: 14.sp),
+                                    ),
+                                  );
+                                }).toList(),
+                                Divider(height: 16.h),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Average: ',
+                                      style: TextStyle(
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${reading.average.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.bold,
+                                        color: _getMoistureColor(reading.average),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          SizedBox(height: 4.h),
-                          ...reading.values.mapIndexed((entry, index) {
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: 4.h),
-                              child: Text(
-                                'Sensor ${index + 1}: ${entry.toStringAsFixed(1)}%',
-                                style: TextStyle(fontSize: 14.sp),
-                              ),
-                            );
-                          }).toList(),
-                          Divider(height: 16.h),
-                          Row(
-                            children: [
-                              Text(
-                                'Average: ',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '${reading.average.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.bold,
-                                  color: _getMoistureColor(reading.average),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  // Padding(
+                  //   padding: const EdgeInsets.all(16.0),
+                  //   child: Row(
+                  //     children: [
+                  //       Text(
+                  //         'Overall Average: ',
+                  //         style: TextStyle(
+                  //           fontSize: 16.sp,
+                  //           fontWeight: FontWeight.bold,
+                  //         ),
+                  //       ),
+                  //       Text(
+                  //         '${_calculateOverallAverage().toStringAsFixed(1)}%',
+                  //         style: TextStyle(
+                  //           fontSize: 16.sp,
+                  //           fontWeight: FontWeight.bold,
+                  //           color: _getMoistureColor(_calculateOverallAverage()),
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
+                ],
               ),
     );
   }
@@ -218,5 +247,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ],
           ),
     );
+  }
+
+  double _calculateOverallAverage() {
+    if (_readings.isEmpty) {
+      return 0;
+    }
+
+    double sum = 0;
+    for (var reading in _readings) {
+      sum += reading.average;
+    }
+
+    return sum / _readings.length;
   }
 }

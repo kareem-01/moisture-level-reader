@@ -43,7 +43,9 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   flutter_screenutil: ^5.9.3
-  
+
+  fluttertoast: ^8.0.9
+
   #bluetooth
   flutter_blue_plus: ^1.35.5
   
