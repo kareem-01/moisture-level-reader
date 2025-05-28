@@ -5,16 +5,49 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:soil_moisture_app/common/extensions/context_extension.dart';
+import 'package:soil_moisture_app/common/util/getMoistureStatus.dart';
 import 'package:soil_moisture_app/common/util/toast%20util.dart';
 import 'package:soil_moisture_app/constants/AppImages.dart';
 import 'package:soil_moisture_app/models/moisture_reading.dart';
 import 'package:soil_moisture_app/services/readings_service.dart';
+
+import 'CustomCurcularChartPainter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class CustomCircularChart extends StatelessWidget {
+  final double progress;
+  final Color progressColor;
+  final Color backgroundColor;
+  final double strokeWidth;
+  final Widget child;
+
+  const CustomCircularChart({
+    super.key,
+    required this.progress,
+    required this.progressColor,
+    required this.backgroundColor,
+    required this.strokeWidth,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: CircularChartPainter(
+        progress: progress,
+        progressColor: progressColor,
+        backgroundColor: backgroundColor,
+        strokeWidth: strokeWidth,
+      ),
+      child: child,
+    );
+  }
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -37,9 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Future.delayed(Duration(seconds: 1), () {
-    //   _startSimulation();
-    // });
+    Future.delayed(Duration(seconds: 1), () {
+      _startSimulation();
+    });
   }
 
   @override
@@ -168,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _logBluetoothDevices(List<ScanResult> results) {
     print(
-      "Found devices: ${results.map((result) => result.device.name).join(', ')}",
+      "Found devices: ${results.map((result) => result.device.platformName).join(', ')}",
     );
   }
 
@@ -201,7 +234,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     final decodedData = utf8.decode(value);
 
                     // Parse the list of measurements
-                    List<String> newMeasurements = decodedData.split(',');
+                    List<String> newMeasurements =
+                        decodedData.split(',').map((e) => e.trim()).toList();
 
                     // Update UI on the main thread
                     setState(() {
@@ -209,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _allMeasurements.add(
                         newMeasurements,
                       ); // Store the measurement
-                      _calculateAverage(); // Calculate average for display only
+                      _calculateAverage();
                     });
 
                     // No longer save readings here - will save on disconnect
@@ -222,27 +256,19 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             }
 
-            // If the characteristic is readable, read the initial value
             if (characteristic.properties.read) {
               final value = await characteristic.read();
-              // Use a microtask to avoid blocking the main thread
               scheduleMicrotask(() {
                 try {
                   final decodedData = utf8.decode(value);
 
-                  // Parse the list of measurements
                   List<String> newMeasurements = decodedData.split(',');
 
-                  // Update UI on the main thread
                   setState(() {
                     _measurements = newMeasurements;
-                    _allMeasurements.add(
-                      newMeasurements,
-                    ); // Store the measurement
-                    _calculateAverage(); // Calculate average for display only
+                    _allMeasurements.add(newMeasurements);
+                    _calculateAverage();
                   });
-
-                  // No longer save readings here - will save on disconnect
                 } catch (e) {
                   setState(() {
                     _measurements = ["Error decoding: ${value.toString()}"];
@@ -294,7 +320,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Calculate and display average value (without saving)
   void _calculateAverage() {
     try {
       List<double> values = _parseValues(_measurements);
@@ -302,7 +327,6 @@ class _HomeScreenState extends State<HomeScreen> {
         double sum = values.reduce((a, b) => a + b);
         double averageValue = sum / values.length;
 
-        // Update the display average
         setState(() {
           _average = averageValue;
         });
@@ -338,7 +362,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Helper method to parse values from string measurements
   List<double> _parseValues(List<String> data) {
     List<double> parsedValues = [];
 
@@ -361,7 +384,8 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           // Try direct parsing if no colon is found
           double? value = double.tryParse(
-              measurement.replaceAll('%', '').trim());
+            measurement.replaceAll('%', '').trim(),
+          );
           if (value != null) {
             parsedValues.add(value);
           } else {
@@ -390,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
             fit: BoxFit.fitHeight,
           ),
           Positioned(
-            top: 24.h,
+            top: 16.h,
             right: 0,
             left: 0,
             child: Image.asset(AppImages.homeLogo, width: 160.w, height: 160.h),
@@ -405,10 +429,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(height: 100.h),
-                  Text(
-                    'Soil Moisture Level:',
-                    style: TextStyle(fontSize: 24.sp, color: Colors.white),
-                  ),
                   SizedBox(height: 20.h),
                   if (!_isConnected)
                     Text(
@@ -422,83 +442,111 @@ class _HomeScreenState extends State<HomeScreen> {
                   else
                     Column(
                       children: [
-                        // Circular gauge chart for average
-                        Container(
-                          width: 200.w,
-                          height: 200.h,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.9),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                offset: Offset(0, 5),
-                              ),
-                            ],
-                          ),
+                        // Container with chart around it
+                        SizedBox(
+                          width: 240.w,
+                          // Larger container to accommodate outer ring
+                          height: 240.h,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              // Blue circular progress
-                              SizedBox(
-                                width: 180.w,
-                                height: 180.h,
-                                child: CircularProgressIndicator(
-                                  value: _average / 100,
-                                  // Assuming 100 is max value
-                                  strokeWidth: 15.w,
-                                  backgroundColor: Colors.grey.withOpacity(0.2),
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF66D1FF), // Light blue
-                                  ),
+                              CustomCircularChart(
+                                progress: _average / 100,
+                                strokeWidth: 20.w,
+                                backgroundColor: Colors.grey.withValues(
+                                  alpha: 0.2,
                                 ),
+                                progressColor: getMoistureColor(_average),
+                                child: Container(), // Empty container as child
                               ),
-                              // Temperature markers
-                              Positioned(
-                                top: 15.h,
-                                child: Text(
-                                  "25°C",
-                                  style: TextStyle(
-                                      fontSize: 12.sp, color: Colors.grey),
-                                ),
-                              ),
-                              Positioned(
-                                left: 15.w,
-                                child: Text(
-                                  "50°C",
-                                  style: TextStyle(
-                                      fontSize: 12.sp, color: Colors.grey),
-                                ),
-                              ),
-                              Positioned(
-                                right: 15.w,
-                                child: Text(
-                                  "10°C",
-                                  style: TextStyle(
-                                      fontSize: 12.sp, color: Colors.grey),
-                                ),
-                              ),
-                              // Center value
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    "${_average.toStringAsFixed(0)}%",
-                                    style: TextStyle(
-                                      fontSize: 36.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
+                              Container(
+                                width: 200.w,
+                                height: 200.h,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 5),
                                     ),
-                                  ),
-                                  Text(
-                                    "Average",
-                                    style: TextStyle(
-                                      fontSize: 14.sp,
-                                      color: Colors.grey,
+                                  ],
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // Temperature labels positioned around the circle
+                                    Positioned(
+                                      top: 15.h,
+                                      child: Text(
+                                        "0",
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    Positioned(
+                                      left: 15.w,
+                                      child: Text(
+                                        "75",
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 15.w,
+                                      child: Text(
+                                        "25",
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 15.h,
+                                      child: Text(
+                                        "50",
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    // Center value
+                                    Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          "${_average.toStringAsFixed(0)}%",
+                                          style: TextStyle(
+                                            fontSize: 36.sp,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                        Text(
+                                          "Average",
+                                          style: TextStyle(
+                                            fontSize: 14.sp,
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -512,26 +560,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               scrollDirection: Axis.horizontal,
                               itemCount: _measurements.length,
                               itemBuilder: (context, index) {
-                                // Define different colors for the cards
                                 List<Color> cardColors = [
                                   Color(0xFF6E5FF8), // Purple
                                   Color(0xFF1FBBB4), // Teal
                                   Color(0xFFFF5D7D), // Pink
                                 ];
 
-                                // Define icons for each sensor
                                 List<IconData> sensorIcons = [
                                   Icons.water_drop,
-                                  Icons.landscape,
-                                  Icons.thermostat,
+                                  Icons.water_drop,
+                                  Icons.water_drop,
                                 ];
 
                                 return Container(
                                   width: 100.w,
                                   margin: EdgeInsets.symmetric(horizontal: 5.w),
                                   decoration: BoxDecoration(
-                                    color: cardColors[index %
-                                        cardColors.length],
+                                    color:
+                                        cardColors[index % cardColors.length],
                                     borderRadius: BorderRadius.circular(15.r),
                                   ),
                                   child: Stack(
@@ -546,7 +592,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           decoration: BoxDecoration(
                                             color: Colors.white,
                                             borderRadius: BorderRadius.circular(
-                                                5.r),
+                                              5.r,
+                                            ),
                                           ),
                                           child: Align(
                                             alignment: Alignment.centerRight,
@@ -559,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 boxShadow: [
                                                   BoxShadow(
                                                     color: Colors.black
-                                                        .withOpacity(0.1),
+                                                        .withValues(alpha: 0.1),
                                                     blurRadius: 2,
                                                   ),
                                                 ],
@@ -583,10 +630,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       Padding(
                                         padding: EdgeInsets.all(10.w),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment
-                                              .start,
-                                          mainAxisAlignment: MainAxisAlignment
-                                              .end,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
                                             Text(
                                               _measurements[index],
@@ -600,8 +647,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               "Sensor ${index + 1}",
                                               style: TextStyle(
                                                 fontSize: 12.sp,
-                                                color: Colors.white.withOpacity(
-                                                    0.8),
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.8,
+                                                ),
                                               ),
                                             ),
                                           ],

@@ -7,6 +7,8 @@ import 'package:soil_moisture_app/models/moisture_reading.dart';
 import 'package:soil_moisture_app/services/readings_service.dart';
 import 'package:velocity_x/velocity_x.dart';
 
+import '../common/util/getMoistureStatus.dart';
+
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -96,7 +98,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       children: [
                                         Icon(
                                           Icons.water_drop,
-                                          color: _getMoistureColor(reading.average),
+                                          color: getMoistureColor(reading.average),
                                           size: 24.r,
                                         ),
                                         SizedBox(width: 8.w),
@@ -144,7 +146,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       style: TextStyle(
                                         fontSize: 16.sp,
                                         fontWeight: FontWeight.bold,
-                                        color: _getMoistureColor(reading.average),
+                                        color: getMoistureColor(reading.average),
                                       ),
                                     ),
                                   ],
@@ -183,15 +185,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Color _getMoistureColor(double value) {
-    if (value < 30) {
-      return Colors.red;
-    } else if (value < 60) {
-      return Colors.orange;
-    } else {
-      return Colors.green;
-    }
-  }
+
 
   Widget _getMoistureStatus(double value) {
     String status;
@@ -211,7 +205,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: color),
       ),

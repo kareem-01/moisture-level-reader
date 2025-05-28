@@ -46,6 +46,8 @@ dependencies:
 
   fluttertoast: ^8.0.9
 
+  percent_indicator: ^4.2.5
+
   #bluetooth
   flutter_blue_plus: ^1.35.5
   
